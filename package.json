@@ -1,0 +1,29 @@
+{
+  "name": "trotar",
+  "version": "0.0.1",
+  "description": "Simple in-memory tarball unpack",
+  "main": "index.js",
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "mocha": "^7.0.1"
+  },
+  "scripts": {
+    "test": "mocha --reporter tap"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xtuc/trotar.git"
+  },
+  "keywords": [
+    "tar",
+    "browser",
+    "web",
+    "memory"
+  ],
+  "author": "Sven Sauleau <sven@sauleau.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/xtuc/trotar/issues"
+  },
+  "homepage": "https://github.com/xtuc/trotar#readme"
+}
