@@ -39,7 +39,7 @@ class UsTarParser {
     this._offset = 0;
     this._chunk = null;
     this._hooks = {
-      file: Function(),
+      file: () => {},
     };
   }
 
