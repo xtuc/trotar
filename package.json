@@ -1,6 +1,6 @@
 {
   "name": "trotar",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Simple in-memory tarball unpack",
   "main": "index.js",
   "devDependencies": {
