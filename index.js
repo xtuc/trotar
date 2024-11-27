@@ -39,11 +39,15 @@ class UsTarParser {
     this._offset = 0;
     this._chunk = null;
     this._hooks = {
-      file: () => {},
+      file: async () => {},
     };
   }
 
   write(chunk) {
+    if (!(chunk instanceof Uint8Array)) {
+      throw new Error("chunk must be an Uint8Array")
+    }
+
     this._offset = 0;
     this._chunk = chunk;
   }
@@ -52,7 +56,7 @@ class UsTarParser {
     return isTarSector(this._chunk, this._offset) === false;
   }
 
-  next() {
+  async next() {
     while (!this.isEnd()) {
       const name = this.eat(100);
       const mode = this.eat(8);
@@ -62,7 +66,7 @@ class UsTarParser {
       size = parseInt(str(size), 8);
       const mtime = this.eat(12);
       const chksum = this.eat(8);
-      const typeflag = this.eat(1);
+      const typeflag = this.eatByte();
       const linkname = this.eat(100);
       const magic = this.eat(6);
       const version = this.eat(2);
@@ -74,13 +78,13 @@ class UsTarParser {
 
       this._offset = roundNextSector(this._offset);
 
-      const content = new Array(size);
-      for (var i = 0, len = size; i < len; i++) {
-        content[i] = this.eat(1)[0];
-      }
+      const content = this._chunk.slice(this._offset, this._offset + size);
+      this._offset += size;
 
-      // notify that we have a file
-      this._hooks["file"](str(name), str(content));
+      if (typeflag === 0 || typeflag === 48) {
+        // notify that we have a file
+        await this._hooks["file"](str(name), content);
+      }
 
       this._offset = roundNextSector(this._offset);
     }
@@ -90,6 +94,11 @@ class UsTarParser {
     const b = this._chunk.slice(this._offset, this._offset + n);
     this._offset += n;
     return b;
+  }
+
+  eatByte() {
+    const b = this.eat(1);
+    return b[0];
   }
 
   on(type, f) {
