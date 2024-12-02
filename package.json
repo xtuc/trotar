@@ -1,7 +1,7 @@
 {
   "name": "trotar",
   "version": "1.1.0",
-  "description": "Simple in-memory tarball unpack",
+  "description": "A performant tar parser with streaming support",
   "main": "index.js",
   "devDependencies": {
     "chai": "^4.2.0",
@@ -18,7 +18,8 @@
     "tar",
     "browser",
     "web",
-    "memory"
+    "memory",
+    "streaming"
   ],
   "author": "Sven Sauleau <sven@sauleau.com>",
   "license": "MIT",

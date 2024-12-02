@@ -1,9 +1,9 @@
 "package/package.json"
-"{\n  \"name\": \"hi-sven\",\n  \"version\": \"1.0.0\",\n  \"description\": \"Say hi to Sven\",\n  \"main\": \"index.js\",\n  \"scripts\": {\n    \"test\": \"echo \\\"Error: no test specified\\\" && exit 1\"\n  },\n  \"author\": \"Sven Sauleau <sven@sauleau.com>\",\n  \"license\": \"MIT\"\n}\n"
+"{\n  \"name\": \"hi-sven\",\n  \"version\": \"1.0.0\",\n  \"description\": \"Say hi to Sven\",\n  \"main\": \"index.js\",\n  \"scripts\": {\n    \"test\": \"echo \\\"Error: no test specified\\\" && exit 1\"\n  },\n  \"author\": \"Sven Sauleau <sven@sauleau.com>\",\n  \"license\": \"MIT\"\n}"
 
 "package/index.js"
-"console.log(\"Hi Sven\");\n"
+"console.log(\"Hi Sven\");"
 
 "package/README.md"
-"# hi-sven\n"
+"# hi-sven"
 
