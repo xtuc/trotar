@@ -163,6 +163,11 @@ class StreamingUSTarParser {
 
     let readBytes = 0;
 
+    if (this._bufferLength < this._needBytes) {
+      // wait for more bytes to come in.
+      return;
+    }
+
     do {
       const state = await this._parser.parse(this._buffer.slice(0, this._bufferLength));
       readBytes = state.readBytes;
