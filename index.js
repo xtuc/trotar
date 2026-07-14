@@ -96,9 +96,9 @@ class USTarParser {
       // Skip any padding after the header
       offset = 512;
 
-      // The last byte is a NUL byte, we ignore it from the content.
-      const content = eat(size - 1);
-      offset += 1;
+      // `size` is the exact file length; the 512-byte record padding after
+      // the content is handled by roundNextSector below.
+      const content = eat(size);
 
       if (typeflag === 0 || typeflag === 48) {
         // notify that we have a file
