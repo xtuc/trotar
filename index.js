@@ -34,12 +34,37 @@ function removeTrailingZero(buff) {
   }
 }
 
+const utf8 = new TextDecoder();
+
+// POSIX pax extended header records: "<length> <key>=<value>\n", where
+// <length> is the decimal byte length of the whole record. Values are UTF-8.
+function parsePax(buffer) {
+  const records = {};
+  let offset = 0;
+  while (offset < buffer.byteLength) {
+    const space = buffer.indexOf(32, offset);
+    if (space < 0) break;
+    const length = parseInt(str(buffer.subarray(offset, space)), 10);
+    if (!(length > 0)) break;
+    const record = buffer.subarray(space + 1, offset + length - 1);
+    const eq = record.indexOf(61);
+    if (eq >= 0) {
+      records[utf8.decode(record.subarray(0, eq))] = utf8.decode(record.subarray(eq + 1));
+    }
+    offset += length;
+  }
+  return records;
+}
+
 // https://wiki.osdev.org/USTAR
 class USTarParser {
   constructor() {
     this._hooks = {
       file: async () => {},
     };
+    // Full path from a pax `path` record or a GNU long-name entry. It applies
+    // to the next entry only, which may arrive in a later parse() call.
+    this._longName = null;
   }
 
   async parse(data) {
@@ -100,9 +125,32 @@ class USTarParser {
       // the content is handled by roundNextSector below.
       const content = eat(size);
 
-      if (typeflag === 0 || typeflag === 48) {
-        // notify that we have a file
-        await this._hooks["file"](str(name), content);
+      if (typeflag === 120) {
+        // "x": pax extended header for the next entry
+        const pax = parsePax(content);
+        // An empty value deletes the override (POSIX pax), so fall back to
+        // the header name.
+        if (pax.path !== undefined) {
+          this._longName = pax.path || null;
+        }
+      } else if (typeflag === 76) {
+        // "L": GNU long name for the next entry, NUL-terminated
+        this._longName = utf8.decode(removeTrailingZero(content)) || null;
+      } else if (typeflag !== 103 && typeflag !== 75) {
+        // Skip "g" (pax global header) and "K" (GNU long link name)
+        if (typeflag === 0 || typeflag === 48) {
+          let path = str(name);
+          if (this._longName !== null) {
+            path = this._longName;
+          } else if (magic[5] === 0 && prefix[0] !== 0) {
+            // POSIX ustar ("ustar\0") splits long paths into prefix and name.
+            // GNU headers ("ustar ") use these bytes for other fields.
+            path = str(prefix) + "/" + path;
+          }
+          // notify that we have a file
+          await this._hooks["file"](path, content);
+        }
+        this._longName = null;
       }
 
       // Skip any padding
