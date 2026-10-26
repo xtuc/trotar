@@ -1,6 +1,6 @@
 {
   "name": "trotar",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A performant tar parser with streaming support",
   "main": "index.js",
   "devDependencies": {
