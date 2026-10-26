@@ -204,3 +204,65 @@ describe('streaming', () => {
   })
 });
 
+describe('long paths', () => {
+  const deepDir = "package/" + "a".repeat(60) + "/" + "b".repeat(60);
+
+  // Feeds `tar` to the streaming parser in `chunkSize` slices and collects
+  // [name, content] pairs.
+  async function extractAll(tar, chunkSize) {
+    const parser = new StreamingUSTarParser();
+    const files = [];
+    parser.on("file", (name, content) => {
+      files.push([name, Buffer.from(content).toString()]);
+    });
+    for (let offset = 0; offset < tar.length; offset += chunkSize) {
+      await parser.write(tar.slice(offset, offset + chunkSize));
+    }
+    return files;
+  }
+
+  // Fixtures written by bsdtar 3.5.3 (libarchive 3.7.4) with --format ustar,
+  // pax and gnutar. Each ends with a short file whose header must not inherit
+  // the long name; in the pax fixture it has its own `x` header without `path`.
+  const cases = [
+    ["long-path-ustar.tar", "joins the ustar prefix and name", deepDir + "/long-path.js", "long\n"],
+    ["long-path-pax.tar", "uses the pax path record", "package/" + "c".repeat(110) + ".js", "pax\n"],
+    ["long-path-gnutar.tar", "uses the UTF-8 GNU long name", deepDir + "/long-path-é.js", "gnu\n"],
+  ];
+
+  for (const [fixture, title, longName, content] of cases) {
+    it(title + " (" + fixture + ")", async () => {
+      const tar = new Uint8Array(readFileSync(join("fixtures", fixture)));
+      const expected = [[longName, content], ["package/short.js", "short\n"]];
+
+      assert.deepEqual(await extractAll(tar, tar.length), expected);
+      // 100-byte chunks put the long-name entry and the entry it names in
+      // separate parse() calls.
+      assert.deepEqual(await extractAll(tar, 100), expected);
+    });
+  }
+
+  it("falls back to the header name when an empty pax path record follows a path", async () => {
+    // An empty pax value deletes the keyword, including a path set by an
+    // earlier extended header, rather than naming the file "".
+    function entry(name, typeflag, content) {
+      const header = Buffer.alloc(512);
+      Buffer.from(name).copy(header, 0);
+      Buffer.from(content.length.toString(8).padStart(11, "0") + "\0").copy(header, 124);
+      header[156] = typeflag.charCodeAt(0);
+      Buffer.from("ustar\u000000").copy(header, 257);
+      const padded = Buffer.alloc(Math.ceil(content.length / 512) * 512);
+      Buffer.from(content).copy(padded, 0);
+      return Buffer.concat([header, padded]);
+    }
+    const tar = new Uint8Array(Buffer.concat([
+      entry("PaxHeader/stale.txt", "x", "25 path=package/stale.txt\n"),
+      entry("PaxHeader/file.txt", "x", "8 path=\n"),
+      entry("package/file.txt", "0", "file\n"),
+      Buffer.alloc(1024),
+    ]));
+
+    assert.deepEqual(await extractAll(tar, tar.length), [["package/file.txt", "file\n"]]);
+  });
+});
+
