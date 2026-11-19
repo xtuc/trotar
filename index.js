@@ -36,6 +36,22 @@ function removeTrailingZero(buff) {
 
 const utf8 = new TextDecoder();
 
+// The 12-byte octal size field. A field of only NULs and spaces reads as 0;
+// GNU tar and bsdtar read all NULs as 0, and bsdtar all spaces. Some packers
+// write an all-NUL size for directory entries.
+// Anything else must be octal digits, optionally padded with whitespace and
+// terminated by NUL. Digits after a leading NUL are rejected (GNU tar skips
+// that NUL, node-tar does not), as are GNU base-256 sizes (high bit set).
+function parseSize(field) {
+  if (field.every(b => b === 0 || b === 32)) return 0;
+  const text = str(field).trim();
+  const size = /^[0-7]+$/.test(text) ? parseInt(text, 8) : NaN;
+  if (!Number.isSafeInteger(size)) {
+    throw new Error("invalid size field " + JSON.stringify(String.fromCharCode(...field)));
+  }
+  return size;
+}
+
 // POSIX pax extended header records: "<length> <key>=<value>\n", where
 // <length> is the decimal byte length of the whole record. Values are UTF-8.
 function parsePax(buffer) {
@@ -97,8 +113,7 @@ class USTarParser {
       const mode = eat(8);
       const uid = eat(8);
       const gid = eat(8);
-      let size = eat(12);
-      size = parseInt(str(size), 8);
+      const size = parseSize(eat(12));
 
       if (data.byteLength < roundNextSector(512 + size)) {
         // Ensure that we have enough bytes for the header and the content
@@ -270,11 +285,7 @@ class StreamingUSTarParser {
       this._ended = true;
       return;
     }
-    const sizeField = str(header.subarray(124, 136)).trim();
-    const size = /^[0-7]+$/.test(sizeField) ? parseInt(sizeField, 8) : NaN;
-    if (!Number.isSafeInteger(size)) {
-      throw new Error("invalid size field " + JSON.stringify(sizeField));
-    }
+    const size = parseSize(header.subarray(124, 136));
     const typeflag = header[156];
 
     if (typeflag === TYPE_PAX || typeflag === TYPE_GNU_LONG_NAME) {

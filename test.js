@@ -461,6 +461,57 @@ describe('streaming parser', () => {
     assert.match(String(error), /invalid size field/);
   });
 
+  it("USTarParser fails on a size field that is not octal", async () => {
+    const tar = entry({ name: "p/a.js", content: "abc" });
+    Buffer.from("0000000009x\0").copy(tar, 124);
+    let error = null;
+    await whole(new Uint8Array(tar)).catch((e) => { error = e; });
+    assert.match(String(error), /invalid size field/);
+  });
+
+  // Seen in @es3d/es3d@0.0.0-stage: the directory entry's size field is 12
+  // NULs. GNU tar and bsdtar read it as 0.
+  describe("size field of only NULs or spaces", () => {
+    const content = "{\"name\":\"nul-size\"}\n";
+    function tarWithBlankDirSize(fill) {
+      const dir = entry({ name: "package/", typeflag: "5" });
+      dir.fill(fill, 124, 136);
+      return new Uint8Array(Buffer.concat([
+        dir,
+        entry({ name: "package/package.json", content }),
+        Buffer.alloc(1024),
+      ]));
+    }
+
+    for (const [label, fill] of [["NULs", 0], ["spaces", 0x20]]) {
+      it("reads " + label + " as 0 in both parsers", async () => {
+        const tar = tarWithBlankDirSize(fill);
+        const expected = [["package/package.json", content]];
+        assert.deepEqual(await whole(tar), expected);
+        for (const size of [1, 512, tar.byteLength]) {
+          const { files } = await stream(chunked(tar, size));
+          assert.deepEqual(files, expected);
+        }
+      });
+    }
+
+    // Not blank, so it must not read as 0. Rejecting it is stricter than GNU
+    // tar, which skips the leading NUL, and matches node-tar.
+    it("still fails when the field has digits after a leading NUL", async () => {
+      const dir = entry({ name: "package/", typeflag: "5" });
+      Buffer.from("\u00000000000216\0").copy(dir, 124);
+      const tar = new Uint8Array(Buffer.concat([dir, Buffer.alloc(1024)]));
+
+      let error = null;
+      await whole(tar).catch((e) => { error = e; });
+      assert.match(String(error), /invalid size field/);
+
+      error = null;
+      await stream([tar]).catch((e) => { error = e; });
+      assert.match(String(error), /invalid size field/);
+    });
+  });
+
   it("fails on pax metadata larger than MAX_META_BYTES instead of buffering it", async () => {
     const header = entry({ name: "PaxHeader/huge", typeflag: "x", size: MAX_META_BYTES + 1 });
     const parser = new StreamingUSTarParser();
